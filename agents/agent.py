@@ -1,14 +1,21 @@
 from abc import ABC, abstractmethod
-import np as np
+import numpy as np
+import random
+import csv
+
+def randArgMax(a):
+    '''Returns the argmax of the array. Ties are broken radnomly.'''
+    return np.argmax(np.random.random(np.shape(a))*(a==np.max(a)))
 class Agent(ABC):
     '''Abstract class defining required functions for an agent'''
 
-    def __init__(self, env, name):
+    def __init__(self, mask, env, name):
         '''Initialize the agent
         input:
             mask: Mask used to understand the game
             name: Name of agent. Used in tag.'''
         self.env = env
+        self.mask = mask
         self.name = name
 
     @abstractmethod
@@ -38,37 +45,35 @@ class Agent(ABC):
         output:
             final score and log if verbose is set to true"""
         env = self.env
-        state = env.reset()
+        prevState = env.reset()
         # record previous state to update learning algorithm
         # whether or not game has reached a gameover state
         game_over = env.is_done()
         # If verbose record a log of game states and scores
         if verbose:
             log = []
-            log.append([env.score(), state.copy()])
+            log.append([env.score(), env.getBoard()])
         while not game_over:
             # Choose next action
-            next_action = self.chooseAction(state.copy(),
+            next_action = self.chooseAction(prevState,
                                             env.available_actions())
+            
             # Perform action and recieve a reward
-            reward = game.do_action(next_action)
+            next_board, reward, game_over, info= env.step(next_action)
             # Update learning algorithm
-            self.learn(prevState, next_action, game.state().copy(), reward)
+            self.learn(prevState, next_action, next_board, reward)
             # Update prevState
-            prevState = game.state().copy()
-            # Add random tile to state
-            game.add_random_tile()
+            prevState = next_board
             # If verbose add new state and score to log
             if verbose:
-                log.append([game.score(), game.state().copy()])
-            # Check if game is over
-            game_over = game.game_over()
+                log.append([env.score(), env.getBoard()])
+            env.render()
         # If verbose return final score and log
         if verbose:
-            return game.score(), log
+            return env.score(), log
         # Else return just final score of game
         else:
-            return game.score()
+            return env.score()
 
     def train(self, numIterations=1000, logFile=None, _mode='w'):
         """Train agent over many games 
@@ -94,95 +99,95 @@ class Agent(ABC):
                 writer.writerow(scores)
         return scores
 
-    def makeGif(self, gif_file, num_trials=10, board_size=4, graphic_size=750,
-                top_margin=40, seperator_width=12, end_pause=50):
-        '''Construct gif of agent playing a game.
-        input:
-            gif_file: File to save gif
-            num_trials: Number of games to look at and choose the best to make
-                        the gif
-            board_size: Number of tiles in one side of board
-            graphic_size: Size of graphic
-            top_margin: Size of top margin
-            seperator_width: Seperation between tiles in graphic
-            end_pause: How many frame to pause at end of gif'''
-        # Play num_trials games and choose best for gif
-        bestFinalScore = 0
-        for i in range(num_trials):
-            finalScore, log = self.play(verbose=True) 
-            if finalScore > bestFinalScore:
-                bestFinalScore = finalScore
-                bestLog = log
-        # Write to gif_file
-        with imageio.get_writer(gif_file, mode='I') as writer:
-            # For every game state
-            for i in range(np.shape(bestLog)[0]):
-                # Create image
-                img=makeImage(bestLog[i][0], bestLog[i][1], board_size,
-                              graphic_size,top_margin, seperator_width)
-                # Append to gif
-                writer.append_data(img)
-                # Pause on last frame
-                if i == np.shape(bestLog)[0]-1:
-                    for i in range(end_pause):
-                        writer.append_data(img)
+    # def makeGif(self, gif_file, num_trials=10, board_size=4, graphic_size=750,
+    #             top_margin=40, seperator_width=12, end_pause=50):
+    #     '''Construct gif of agent playing a game.
+    #     input:
+    #         gif_file: File to save gif
+    #         num_trials: Number of games to look at and choose the best to make
+    #                     the gif
+    #         board_size: Number of tiles in one side of board
+    #         graphic_size: Size of graphic
+    #         top_margin: Size of top margin
+    #         seperator_width: Seperation between tiles in graphic
+    #         end_pause: How many frame to pause at end of gif'''
+    #     # Play num_trials games and choose best for gif
+    #     bestFinalScore = 0
+    #     for i in range(num_trials):
+    #         finalScore, log = self.play(verbose=True) 
+    #         if finalScore > bestFinalScore:
+    #             bestFinalScore = finalScore
+    #             bestLog = log
+    #     # Write to gif_file
+    #     with imageio.get_writer(gif_file, mode='I') as writer:
+    #         # For every game state
+    #         for i in range(np.shape(bestLog)[0]):
+    #             # Create image
+    #             img=makeImage(bestLog[i][0], bestLog[i][1], board_size,
+    #                           graphic_size,top_margin, seperator_width)
+    #             # Append to gif
+    #             writer.append_data(img)
+    #             # Pause on last frame
+    #             if i == np.shape(bestLog)[0]-1:
+    #                 for i in range(end_pause):
+    #                     writer.append_data(img)
 
-    def makeGraph(self, scores=[], logFile=None, graphFile=None, label=None, rollingWindow=30):
-        '''Construct graph showing performance over training.
-        input:
-            scores: Scores to plot
-            logFile: File to read scores in from. Will be append to provided
-                     scores.
-            graphFile: File to write graph to. Does not save graph if is None.
-            label: Label for graph
-            rollingWindow: Window for rolling average to smooth graph'''
-        # Append scores in logFile to scores
-        if logFile is not None:
-            with open(logFile, mode='r') as log_File:
-                reader = csv.reader(log_File, delimiter='\n')
-                for row in reader:
-                    scores.append(int(row[0]))
-        # Calculate rolling averages
-        rollingAverages = np.convolve(scores, np.ones((rollingWindow,))/rollingWindow, mode='valid')
-        # Calculate values for x axis
-        x = np.arange(len(rollingAverages))+rollingWindow/2
-        # If label is none set label to tag
-        if label is None:
-            label=self.getTag()
-        # Plot rollingAverages versus x
-        plt.plot(x, rollingAverages, label=label)
-        # Label axes
-        plt.xlabel('Trial')
-        plt.ylabel('Score')
-        # Save graph
-        if graphFile is not None:
-            plt.savefig(graphFile)
-            plt.clf()
+    # def makeGraph(self, scores=[], logFile=None, graphFile=None, label=None, rollingWindow=30):
+    #     '''Construct graph showing performance over training.
+    #     input:
+    #         scores: Scores to plot
+    #         logFile: File to read scores in from. Will be append to provided
+    #                  scores.
+    #         graphFile: File to write graph to. Does not save graph if is None.
+    #         label: Label for graph
+    #         rollingWindow: Window for rolling average to smooth graph'''
+    #     # Append scores in logFile to scores
+    #     if logFile is not None:
+    #         with open(logFile, mode='r') as log_File:
+    #             reader = csv.reader(log_File, delimiter='\n')
+    #             for row in reader:
+    #                 scores.append(int(row[0]))
+    #     # Calculate rolling averages
+    #     rollingAverages = np.convolve(scores, np.ones((rollingWindow,))/rollingWindow, mode='valid')
+    #     # Calculate values for x axis
+    #     x = np.arange(len(rollingAverages))+rollingWindow/2
+    #     # If label is none set label to tag
+    #     if label is None:
+    #         label=self.getTag()
+    #     # Plot rollingAverages versus x
+    #     plt.plot(x, rollingAverages, label=label)
+    #     # Label axes
+    #     plt.xlabel('Trial')
+    #     plt.ylabel('Score')
+    #     # Save graph
+    #     if graphFile is not None:
+    #         plt.savefig(graphFile)
+    #         plt.clf()
     
-    def getTag(self):
-        '''Return tag of agent'''
-        return self.name + '_' + self.mask.getTag()
+    # def getTag(self):
+    #     '''Return tag of agent'''
+    #     return self.name + '_' + self.mask.getTag()
 
-    def save(self, fileName):
-        '''Save agent with pickle
-        input:
-            fileName: Save file '''
-        pickleFile = open(fileName, 'wb')
-        pickle.dump(self.tuples, pickleFile)
-        pickleFile.close()
+    # def save(self, fileName):
+    #     '''Save agent with pickle
+    #     input:
+    #         fileName: Save file '''
+    #     pickleFile = open(fileName, 'wb')
+    #     pickle.dump(self.tuples, pickleFile)
+    #     pickleFile.close()
 
-    def load(self, fileName):
-        '''Load agent using pickle
-        input:
-            fileName: Save file'''
-        pickleFile = open(fileName, 'rb')
-        self.tuples = pickle.load(pickleFile)
-        pickleFile.close()
+    # def load(self, fileName):
+    #     '''Load agent using pickle
+    #     input:
+    #         fileName: Save file'''
+    #     pickleFile = open(fileName, 'rb')
+    #     self.tuples = pickle.load(pickleFile)
+    #     pickleFile.close()
 
 class QAgent(Agent):
     '''Class to perform q learning'''
 
-    def __init__(self, mask, a=0.025, g=0.9999, e=0.0001, name='q'):
+    def __init__(self, mask, env, a=0.025, g=0.9999, e=0.0001, name='q'):
         '''Initialize the agent
         input:
             mask: Mask used to understand the game
@@ -190,12 +195,12 @@ class QAgent(Agent):
             g: Discount factor
             e: Exploration rate
             name: Name of agent. Used in tag.'''
-        super().__init__(mask, name)
+        super().__init__(mask, env, name)
         self.alpha = a
         self.gamma = g
         self.epsilon = e
         # Initialize q table
-        self.tuples = numpy.zeros((self.mask.getMaxTupleNum(), 4), dtype=float)
+        self.tuples = np.zeros((self.mask.getMaxTupleNum(), 4), dtype=float)
 
     def learn(self, prevState, action, state, reward): 
         '''Q Learning Algorithm
@@ -207,8 +212,13 @@ class QAgent(Agent):
         # Get tupleNums of previous state
         tupleNums = self.mask.getTupleNums(prevState)
         # Choose next action off policy 
-        next_action = randArgMax(numpy.sum([self.tuples[num] for num in tupleNums], axis=0))
+        next_action = randArgMax(np.sum([self.tuples[num] for num in tupleNums], axis=0))
         # Calculate qError
+        print("newState", self.lookUp(state,next_action))
+        print("prevState", self.lookUp(prevState,action))
+        print(self.gamma)
+        print(self.alpha)
+        print(reward)
         qError = self.alpha*(reward+self.gamma*self.lookUp(state,next_action)-self.lookUp(prevState,action))
         # Update table entry for each tupleNum
 
@@ -225,11 +235,11 @@ class QAgent(Agent):
         output: Next action to take'''
         # Epsilon percent of the time take a random action
         if (random.random() < self.epsilon):
-            return actions[random.randint(0, numpy.size(actions) - 1)]
+            return actions[random.randint(0, np.size(actions) - 1)]
         # Else Choose action that has highest value in lookup table
         values = self.lookUp(state)
         for action in [0, 1, 2, 3]:
-            if not numpy.isin(action, actions):
+            if not np.isin(action, actions):
                 values[action] = -1
         return randArgMax(values)
         
@@ -244,7 +254,7 @@ class QAgent(Agent):
         tupleNums = self.mask.getTupleNums(state)
         # If action is none get value for each action
         if action is None:
-            return numpy.sum([self.tuples[num] for num in tupleNums], axis=0)
+            return np.sum([self.tuples[num] for num in tupleNums], axis=0)
         else:
             # Add up the value for each tupleNum
             return sum([self.tuples[num, action] for num in tupleNums])
