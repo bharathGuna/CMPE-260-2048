@@ -16,5 +16,6 @@ register(
     kwargs={
         'width': 4,
         'height': 4,
+        'state': None,
     }
 )

@@ -2,10 +2,9 @@ from abc import ABC, abstractmethod
 import numpy as np
 import random
 import csv
+import imageio
+from agents.utils import makeImage
 
-def randArgMax(a):
-    '''Returns the argmax of the array. Ties are broken radnomly.'''
-    return np.argmax(np.random.random(np.shape(a))*(a==np.max(a)))
 class Agent(ABC):
     '''Abstract class defining required functions for an agent'''
 
@@ -67,7 +66,6 @@ class Agent(ABC):
             # If verbose add new state and score to log
             if verbose:
                 log.append([env.score(), env.getBoard()])
-            env.render()
         # If verbose return final score and log
         if verbose:
             return env.score(), log
@@ -99,38 +97,38 @@ class Agent(ABC):
                 writer.writerow(scores)
         return scores
 
-    # def makeGif(self, gif_file, num_trials=10, board_size=4, graphic_size=750,
-    #             top_margin=40, seperator_width=12, end_pause=50):
-    #     '''Construct gif of agent playing a game.
-    #     input:
-    #         gif_file: File to save gif
-    #         num_trials: Number of games to look at and choose the best to make
-    #                     the gif
-    #         board_size: Number of tiles in one side of board
-    #         graphic_size: Size of graphic
-    #         top_margin: Size of top margin
-    #         seperator_width: Seperation between tiles in graphic
-    #         end_pause: How many frame to pause at end of gif'''
-    #     # Play num_trials games and choose best for gif
-    #     bestFinalScore = 0
-    #     for i in range(num_trials):
-    #         finalScore, log = self.play(verbose=True) 
-    #         if finalScore > bestFinalScore:
-    #             bestFinalScore = finalScore
-    #             bestLog = log
-    #     # Write to gif_file
-    #     with imageio.get_writer(gif_file, mode='I') as writer:
-    #         # For every game state
-    #         for i in range(np.shape(bestLog)[0]):
-    #             # Create image
-    #             img=makeImage(bestLog[i][0], bestLog[i][1], board_size,
-    #                           graphic_size,top_margin, seperator_width)
-    #             # Append to gif
-    #             writer.append_data(img)
-    #             # Pause on last frame
-    #             if i == np.shape(bestLog)[0]-1:
-    #                 for i in range(end_pause):
-    #                     writer.append_data(img)
+    def makeGif(self, gif_file, num_trials=10, board_size=4, graphic_size=750,
+                top_margin=40, seperator_width=12, end_pause=50):
+        '''Construct gif of agent playing a game.
+        input:
+            gif_file: File to save gif
+            num_trials: Number of games to look at and choose the best to make
+                        the gif
+            board_size: Number of tiles in one side of board
+            graphic_size: Size of graphic
+            top_margin: Size of top margin
+            seperator_width: Seperation between tiles in graphic
+            end_pause: How many frame to pause at end of gif'''
+        # Play num_trials games and choose best for gif
+        bestFinalScore = 0
+        for i in range(num_trials):
+            finalScore, log = self.play(verbose=True) 
+            if finalScore > bestFinalScore:
+                bestFinalScore = finalScore
+                bestLog = log
+        # Write to gif_file
+        with imageio.get_writer(gif_file, mode='I') as writer:
+            # For every game state
+            for i in range(np.shape(bestLog)[0]):
+                # Create image
+                img=makeImage(bestLog[i][0], bestLog[i][1], board_size,
+                              graphic_size,top_margin, seperator_width)
+                # Append to gif
+                writer.append_data(img)
+                # Pause on last frame
+                if i == np.shape(bestLog)[0]-1:
+                    for i in range(end_pause):
+                        writer.append_data(img)
 
     # def makeGraph(self, scores=[], logFile=None, graphFile=None, label=None, rollingWindow=30):
     #     '''Construct graph showing performance over training.
@@ -183,86 +181,3 @@ class Agent(ABC):
     #     pickleFile = open(fileName, 'rb')
     #     self.tuples = pickle.load(pickleFile)
     #     pickleFile.close()
-
-class QAgent(Agent):
-    '''Class to perform q learning'''
-
-    def __init__(self, mask, env, a=0.025, g=0.9999, e=0.0001, name='q'):
-        '''Initialize the agent
-        input:
-            mask: Mask used to understand the game
-            a: Learning rate
-            g: Discount factor
-            e: Exploration rate
-            name: Name of agent. Used in tag.'''
-        super().__init__(mask, env, name)
-        self.alpha = a
-        self.gamma = g
-        self.epsilon = e
-        # Initialize q table
-        self.tuples = np.zeros((self.mask.getMaxTupleNum(), 4), dtype=float)
-
-    def learn(self, prevState, action, state, reward): 
-        '''Q Learning Algorithm
-        input:
-            prevState: State before action is taken
-            action: Action taken
-            state: State after action is taken
-            reward: Reward recieved from action'''
-        # Get tupleNums of previous state
-        tupleNums = self.mask.getTupleNums(prevState)
-        # Choose next action off policy 
-        next_action = randArgMax(np.sum([self.tuples[num] for num in tupleNums], axis=0))
-        # Calculate qError
-        print("newState", self.lookUp(state,next_action))
-        print("prevState", self.lookUp(prevState,action))
-        print(self.gamma)
-        print(self.alpha)
-        print(reward)
-        qError = self.alpha*(reward+self.gamma*self.lookUp(state,next_action)-self.lookUp(prevState,action))
-        # Update table entry for each tupleNum
-
-        for num in tupleNums:
-            self.tuples[num, action] += qError
-            if self.tuples[num, action] < 0:
-                self.tuples[num, action] = 0
-        
-    def chooseAction(self, state, actions):
-        '''Choose next action to take with q algorithm
-        input:
-            state: Current state of game
-            actions: Possible actions to take
-        output: Next action to take'''
-        # Epsilon percent of the time take a random action
-        if (random.random() < self.epsilon):
-            return actions[random.randint(0, np.size(actions) - 1)]
-        # Else Choose action that has highest value in lookup table
-        values = self.lookUp(state)
-        for action in [0, 1, 2, 3]:
-            if not np.isin(action, actions):
-                values[action] = -1
-        return randArgMax(values)
-        
-    def lookUp(self, state, action=None):
-        ''' Look up value of state(action pair) in look up table
-        input:
-            state: State to look up
-            action: Next action to take. If action is none look up the value
-                    for each action.
-        output: Value of state(action pair) in look up table'''
-        # Get tuple nums of state
-        tupleNums = self.mask.getTupleNums(state)
-        # If action is none get value for each action
-        if action is None:
-            return np.sum([self.tuples[num] for num in tupleNums], axis=0)
-        else:
-            # Add up the value for each tupleNum
-            return sum([self.tuples[num, action] for num in tupleNums])
-
-    def getTag(self):
-        '''Return tag of agent'''
-        tag = super().getTag()
-        tag += '_a'+str(self.alpha).split('.')[1]
-        tag += 'e'+str(self.epsilon).split('.')[1]
-        tag += 'g'+str(self.gamma).split('.')[1]
-        return tag

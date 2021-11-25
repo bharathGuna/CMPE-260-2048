@@ -28,7 +28,7 @@ class Base2048Env(gym.Env):
       DOWN: 'down',
   }
 
-  def __init__(self, score=0, width=4, height=4):
+  def __init__(self, state=None, score=0, width=4, height=4):
     self.width = width
     self.height = height
     self._score = score
@@ -117,6 +117,9 @@ class Base2048Env(gym.Env):
     self._score = 0
     return self._board
 
+  def setBoard(self, board):
+    self.board = board
+    
   def score(self):
     return self._score
 
