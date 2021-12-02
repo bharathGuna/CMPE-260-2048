@@ -53,6 +53,7 @@ class TD0Agent(Agent):
         values = np.full(4, -1, dtype=float)
         for action in actions:
             tempGame = gym.make('2048-v0', state=np.copy(state))
+            tempGame.reset()
             board, reward,done,info = tempGame.step(action)
             values[action] = reward + self.lookUp(board)
         return randArgMax(values)
