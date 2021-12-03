@@ -1,9 +1,9 @@
 import gym
 import gym_2048
-from agents.q_agent import QAgent
-from agents.sarsa_agent import SARSAAgent
-from agents.tdo_agent import TD0Agent
-from agents.mask import Mask_rxcx4
+from QLearning_Sarsa_TD0_agents.q_agent import QAgent
+from QLearning_Sarsa_TD0_agents.sarsa_agent import SARSAAgent
+from QLearning_Sarsa_TD0_agents.tdo_agent import TD0Agent
+from QLearning_Sarsa_TD0_agents.mask import Mask_rxcx4
 env = gym.make('2048-v0')
 env.seed(42)
 print(env.observation_space)

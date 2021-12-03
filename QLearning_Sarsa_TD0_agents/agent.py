@@ -3,7 +3,7 @@ import numpy as np
 import random
 import csv
 import imageio
-from agents.utils import makeImage
+from QLearning_Sarsa_TD0_agents.utils import makeImage
 
 class Agent(ABC):
     '''Abstract class defining required functions for an agent'''

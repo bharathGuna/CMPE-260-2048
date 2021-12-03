@@ -1,13 +1,12 @@
-from agents.agent import Agent
-from agents.utils import randArgMax
+from QLearning_Sarsa_TD0_agents.agent import Agent
+from QLearning_Sarsa_TD0_agents.utils import randArgMax
 import random
 import numpy as np
-import gym
-import gym_2048
-class TD0Agent(Agent):
-    '''Class to perform TD0 learning'''
 
-    def __init__(self, mask, env, a=0.02, g=0.9999, e=0.0001, name='td0'):
+class QAgent(Agent):
+    '''Class to perform q learning'''
+
+    def __init__(self, mask, env, a=0.025, g=0.9999, e=0.0001, name='q'):
         '''Initialize the agent
         input:
             mask: Mask used to understand the game
@@ -19,11 +18,11 @@ class TD0Agent(Agent):
         self.alpha = a
         self.gamma = g
         self.epsilon = e
-        #Initialize table
-        self.tuples = np.zeros(self.mask.getMaxTupleNum(), dtype=float)
+        # Initialize q table
+        self.tuples = np.zeros((self.mask.getMaxTupleNum(), 4), dtype=float)
 
     def learn(self, prevState, action, state, reward): 
-        '''TD0 Learning Algorithm
+        '''Q Learning Algorithm
         input:
             prevState: State before action is taken
             action: Action taken
@@ -31,16 +30,19 @@ class TD0Agent(Agent):
             reward: Reward recieved from action'''
         # Get tupleNums of previous state
         tupleNums = self.mask.getTupleNums(prevState)
-        # Calculate tdError
-        tdError = self.alpha*(reward+self.gamma*self.lookUp(state)-self.lookUp(prevState))
+        # Choose next action off policy 
+        next_action = randArgMax(np.sum([self.tuples[num] for num in tupleNums], axis=0))
+        # Calculate qError
+        qError = self.alpha*(reward+self.gamma*self.lookUp(state,next_action)-self.lookUp(prevState,action))
         # Update table entry for each tupleNum
-        for num in tupleNums:
-            self.tuples[num] += tdError
-            if self.tuples[num] < 0:
-                self.tuples[num] = 0
 
+        for num in tupleNums:
+            self.tuples[num, action] += qError
+            if self.tuples[num, action] < 0:
+                self.tuples[num, action] = 0
+        
     def chooseAction(self, state, actions):
-        '''Choose next action to take with td0 algorithm
+        '''Choose next action to take with q algorithm
         input:
             state: Current state of game
             actions: Possible actions to take
@@ -48,17 +50,14 @@ class TD0Agent(Agent):
         # Epsilon percent of the time take a random action
         if (random.random() < self.epsilon):
             return actions[random.randint(0, np.size(actions) - 1)]
-        # Else take action that puts you in state with highest value in look up
-        # table
-        values = np.full(4, -1, dtype=float)
-        for action in actions:
-            tempGame = gym.make('2048-v0', state=np.copy(state))
-            tempGame.reset()
-            board, reward,done,info = tempGame.step(action)
-            values[action] = reward + self.lookUp(board)
+        # Else Choose action that has highest value in lookup table
+        values = self.lookUp(state)
+        for action in [0, 1, 2, 3]:
+            if not np.isin(action, actions):
+                values[action] = -1
         return randArgMax(values)
-
-    def lookUp(self, state):
+        
+    def lookUp(self, state, action=None):
         ''' Look up value of state(action pair) in look up table
         input:
             state: State to look up
@@ -67,8 +66,12 @@ class TD0Agent(Agent):
         output: Value of state(action pair) in look up table'''
         # Get tuple nums of state
         tupleNums = self.mask.getTupleNums(state)
-        # Add up the value for each tupleNum
-        return np.sum([self.tuples[num] for num in tupleNums])
+        # If action is none get value for each action
+        if action is None:
+            return np.sum([self.tuples[num] for num in tupleNums], axis=0)
+        else:
+            # Add up the value for each tupleNum
+            return sum([self.tuples[num, action] for num in tupleNums])
 
     def getTag(self):
         '''Return tag of agent'''
@@ -76,4 +79,4 @@ class TD0Agent(Agent):
         tag += '_a'+str(self.alpha).split('.')[1]
         tag += 'e'+str(self.epsilon).split('.')[1]
         tag += 'g'+str(self.gamma).split('.')[1]
-        return tag   
+        return tag

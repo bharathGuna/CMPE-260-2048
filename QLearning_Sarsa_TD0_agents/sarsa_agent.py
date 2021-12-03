@@ -1,12 +1,13 @@
-from agents.agent import Agent
-from agents.utils import randArgMax
+# SARSA is an ON-Policy technique in Reinforcement learning
+from QLearning_Sarsa_TD0_agents.agent import Agent
+from QLearning_Sarsa_TD0_agents.utils import randArgMax
 import random
 import numpy as np
 
-class QAgent(Agent):
-    '''Class to perform q learning'''
+class SARSAAgent(Agent):
+    '''Class to perform SARSA learning'''
 
-    def __init__(self, mask, env, a=0.025, g=0.9999, e=0.0001, name='q'):
+    def __init__(self, mask, env, a=0.01, g=0.75, e=0.001, name='SARSA'):
         '''Initialize the agent
         input:
             mask: Mask used to understand the game
@@ -14,15 +15,16 @@ class QAgent(Agent):
             g: Discount factor
             e: Exploration rate
             name: Name of agent. Used in tag.'''
+
         super().__init__(mask, env, name)
         self.alpha = a
         self.gamma = g
         self.epsilon = e
-        # Initialize q table
+        # Initialize table
         self.tuples = np.zeros((self.mask.getMaxTupleNum(), 4), dtype=float)
 
     def learn(self, prevState, action, state, reward): 
-        '''Q Learning Algorithm
+        '''SARSA Learning Algorithm
         input:
             prevState: State before action is taken
             action: Action taken
@@ -30,19 +32,18 @@ class QAgent(Agent):
             reward: Reward recieved from action'''
         # Get tupleNums of previous state
         tupleNums = self.mask.getTupleNums(prevState)
-        # Choose next action off policy 
-        next_action = randArgMax(np.sum([self.tuples[num] for num in tupleNums], axis=0))
-        # Calculate qError
-        qError = self.alpha*(reward+self.gamma*self.lookUp(state,next_action)-self.lookUp(prevState,action))
+        # Choose next action on policy
+        next_action = self.chooseAction(state, self.env.available_actions())
+        # Calculate sarsaError
+        sarsaError = self.alpha*(reward+self.gamma*self.lookUp(state,next_action)-self.lookUp(prevState,action))
         # Update table entry for each tupleNum
-
         for num in tupleNums:
-            self.tuples[num, action] += qError
+            self.tuples[num, action] += sarsaError
             if self.tuples[num, action] < 0:
                 self.tuples[num, action] = 0
         
     def chooseAction(self, state, actions):
-        '''Choose next action to take with q algorithm
+        '''Choose next action to take with sarsa algorithm
         input:
             state: Current state of game
             actions: Possible actions to take
