@@ -1,3 +1,4 @@
+# SARSA is an ON-Policy technique in Reinforcement learning
 from agents.agent import Agent
 from agents.utils import randArgMax
 import random
